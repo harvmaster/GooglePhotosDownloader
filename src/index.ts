@@ -31,7 +31,7 @@ const run = async () => {
   const metadata = await storage.readJsonFile<Array<DownloadedItem>>('metadata.json');
   if (metadata) {
     downloadQueue.addFilter((item) => {
-      return metadata.some((metadataItem) => metadataItem.id === item.id);
+      return metadata.some((metadataItem) => metadataItem.id === item.id && metadataItem.downloaded);
     });
   }
 
