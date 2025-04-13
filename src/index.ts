@@ -38,6 +38,7 @@ const run = async () => {
   const indexer = new Indexer({
     configService: config,
     authService: authService,
+    storageService: storage,
     downloadQueue,
     processor,
   });

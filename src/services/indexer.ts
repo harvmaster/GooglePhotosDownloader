@@ -2,6 +2,7 @@ import type { MediaItem, MediaItemsResponse } from '../types';
 
 import type { AuthService } from './auth';
 import type { ConfigService } from './config';
+import type { StorageService } from './storage';
 import type { Queue } from '../utils/queue';
 import type { ParallelProcessor } from '../utils/parellel-processor';
 
@@ -10,9 +11,11 @@ import { ExponentialBackoffRetry } from '../utils/exponential-backoff';
 import debug, { Debug } from 'debug';
 import Photos from 'googlephotos';
 
+
 export type IndexerDependencies = {
   authService: AuthService;
   configService: ConfigService;
+  storageService: StorageService;
   downloadQueue: Queue<MediaItem>;
   processor: ParallelProcessor;
 };
@@ -73,17 +76,27 @@ export class Indexer {
       // Execute the request with exponential backoff
       const request = () => exponentialBackoff.execute(fetchItems);
 
-      // Add this to the queue with priority 0 (highest priority)
-      const result = await this.dependencies.processor.process(request, 0);
+      try {
+        // Add this to the queue with priority 0 (highest priority)
+        const result = await this.dependencies.processor.process(request, 0);
 
-      // Add items to the queue
-      result.mediaItems.forEach(item => {
-        this.dependencies.downloadQueue.addItem(item);
-      });
+        // Add items to the queue
+        result.mediaItems.forEach(item => {
+          this.dependencies.downloadQueue.addItem(item);
+        });
 
-      // Update the next page token
-      nextPageToken = result.nextPageToken;
-      pageCount++;
+        // Update the next page token
+        nextPageToken = result.nextPageToken;
+        pageCount++;
+      } catch (error) {
+        this.dependencies.storageService.saveFile(`error.json`, JSON.stringify({
+          error,
+          pageCount,
+          nextPageToken,
+        }));
+
+        this.logger(`Error fetching page ${pageCount + 1}: ${error}`);
+      }
     } while(nextPageToken);
 
     this.logger(`Scanned ${pageCount} pages`);
