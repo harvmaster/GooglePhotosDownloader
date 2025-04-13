@@ -10,7 +10,7 @@ import { StorageService } from './services/storage';
 
 import type { MediaItem } from './types';
 type DownloadedItem = MediaItem & { downloaded: boolean };
-const items: Array<DownloadedItem> = [];
+let items: Array<DownloadedItem> = [];
 
 const run = async () => {
   const config = ConfigService.from(process.env);
@@ -27,13 +27,6 @@ const run = async () => {
 
   const downloadQueue = new Queue<MediaItem>();
   const processor = new ParallelProcessor();
-
-  const metadata = await storage.readJsonFile<Array<DownloadedItem>>('metadata.json');
-  if (metadata) {
-    downloadQueue.addFilter((item) => {
-      return metadata.some((metadataItem) => metadataItem.id === item.id && metadataItem.downloaded);
-    });
-  }
 
   const downloader = new DownloaderService({
     configService: config,
@@ -76,6 +69,19 @@ const run = async () => {
       console.error(`Failed to download ${item.item.filename}`);
     }
   });
+
+  const metadata = await storage.readJsonFile<Array<DownloadedItem>>('metadata.json');
+  if (metadata) {
+    items = metadata;
+
+    downloadQueue.addFilter((item) => {
+      return items.some((metadataItem) => metadataItem.id === item.id && metadataItem.downloaded);
+    });
+
+    items.forEach((item) => {
+      downloadQueue.addItem(item);
+    });
+  }
 
   await indexer.scanLibrary();
 }
