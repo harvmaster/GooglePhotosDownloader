@@ -14,6 +14,10 @@ const items: Array<DownloadedItem> = [];
 
 const run = async () => {
   const config = ConfigService.from(process.env);
+  const storage = new StorageService({
+    configService: config,
+  }, `${process.cwd()}/downloads`);
+
   const authService = await AuthService.create({ configService: config });
 
   await authService.waitFor('authed', (payload) => {
@@ -23,6 +27,13 @@ const run = async () => {
 
   const downloadQueue = new Queue<MediaItem>();
   const processor = new ParallelProcessor();
+
+  const metadata = await storage.readJsonFile<Array<DownloadedItem>>('metadata.json');
+  if (metadata) {
+    downloadQueue.addFilter((item) => {
+      return metadata.some((metadataItem) => metadataItem.id === item.id);
+    });
+  }
 
   const downloader = new DownloaderService({
     configService: config,
@@ -37,10 +48,6 @@ const run = async () => {
     downloadQueue,
     processor,
   });
-
-  const storage = new StorageService({
-    configService: config,
-  }, `${process.cwd()}/downloads`);
 
   const metadataFilePath = `metadata.json`;
 

@@ -61,6 +61,11 @@ export class Indexer {
         this.logger(`Fetching page ${pageCount + 1}`);
 
         const response: MediaItemsResponse = await this.photos.mediaItems.list(100, nextPageToken);
+
+        if (response === undefined || response.mediaItems === undefined) {
+          throw new Error(`No media items found: response: ${JSON.stringify(response)}`);
+        }
+
         nextPageToken = response.nextPageToken;
         return response;
       }
