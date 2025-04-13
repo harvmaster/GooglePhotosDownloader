@@ -2,7 +2,7 @@ import type { MediaItem, MediaItemsResponse } from '../types';
 
 import type { AuthService } from './auth';
 import type { ConfigService } from './config';
-import type { StorageService } from './storage';
+import type { DocumentStorageService } from './document-storage';
 import type { Queue } from '../utils/queue';
 import type { ParallelProcessor } from '../utils/parellel-processor';
 
@@ -12,19 +12,25 @@ import debug, { Debug } from 'debug';
 import Photos from 'googlephotos';
 
 
-export type IndexerDependencies = {
+export type IndexerDependencies<T extends { errors: IndexerError } = { errors: IndexerError }> = {
   authService: AuthService;
   configService: ConfigService;
-  storageService: StorageService;
+  documentStorageService: DocumentStorageService<T>;
   downloadQueue: Queue<MediaItem>;
   processor: ParallelProcessor;
 };
 
-export class Indexer {
+export type IndexerError = {
+  error: string;
+  pageCount: number;
+  nextPageToken: string;
+};
+
+export class Indexer<T extends { errors: IndexerError } = { errors: IndexerError }> {
   private photos: Photos;
   private logger: Debug;
 
-  constructor(private readonly dependencies: IndexerDependencies) {
+  constructor(private readonly dependencies: IndexerDependencies<T>) {
     this.logger = debug('indexer');
 
     if (!this.dependencies.configService.config.ACCESS_TOKEN) {
@@ -89,11 +95,15 @@ export class Indexer {
         nextPageToken = result.nextPageToken;
         pageCount++;
       } catch (error) {
-        this.dependencies.storageService.saveFile(`error.json`, JSON.stringify({
-          error,
+        const errorStr = error instanceof Error 
+          ? JSON.stringify({ message: error.message, stack: error.stack }) 
+          : JSON.stringify(error);
+
+        await this.dependencies.documentStorageService.save('errors', {
+          error: errorStr,
           pageCount,
-          nextPageToken,
-        }));
+          nextPageToken: nextPageToken ?? '',
+        });
 
         this.logger(`Error fetching page ${pageCount + 1}: ${error}`);
       }

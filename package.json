@@ -20,10 +20,12 @@
     "vitest": "^3.1.1"
   },
   "dependencies": {
+    "better-sqlite3": "^11.9.1",
     "debug": "^4.4.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "google-auth-library": "^9.15.1",
-    "googlephotos": "^0.3.5"
+    "googlephotos": "^0.3.5",
+    "kysely": "^0.28.0"
   }
 }

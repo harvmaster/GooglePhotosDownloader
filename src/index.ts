@@ -1,20 +1,51 @@
 import 'dotenv/config';
 
 import { ConfigService } from './services/config';
-import { Indexer } from './services/indexer';
+import { Indexer, IndexerError } from './services/indexer';
 import { Queue } from './utils/queue';
 import { ParallelProcessor } from './utils/parellel-processor';
 import { DownloaderService } from './services/downloader';
 import { AuthService } from './services/auth';
-import { StorageService } from './services/storage';
+
+import { StorageService } from './services/file-storage';
+import { DocumentStorageService } from './services/document-storage';
 
 import type { MediaItem } from './types';
-type DownloadedItem = MediaItem & { downloaded: boolean };
+
+type DownloadedItem = MediaItem & { downloaded: number };
 let items: Array<DownloadedItem> = [];
 
 const run = async () => {
   const config = ConfigService.from(process.env);
-  const storage = new StorageService({
+
+  const documentStorageService = DocumentStorageService.create<{
+    errors: IndexerError;
+    media_items: DownloadedItem;
+  }>({
+    configService: config,
+  });
+
+  // Create the media_items table
+  await documentStorageService.createTable('media_items')
+    .ifNotExists()
+    .addColumn('description', 'text')
+    .addColumn('productUrl', 'text')
+    .addColumn('baseUrl', 'text')
+    .addColumn('mimeType', 'text')
+    .addColumn('mediaMetadata', 'json')
+    .addColumn('contributorInfo', 'json')
+    .addColumn('filename', 'text')
+    .addColumn('downloaded', 'bigint')
+    .execute()
+
+  await documentStorageService.createTable('errors')
+    .ifNotExists()
+    .addColumn('error', 'text')
+    .addColumn('pageCount', 'integer')
+    .addColumn('nextPageToken', 'text')
+    .execute()
+
+  const fileStorage = new StorageService({
     configService: config,
   }, `${process.cwd()}/downloads`);
 
@@ -38,20 +69,32 @@ const run = async () => {
   const indexer = new Indexer({
     configService: config,
     authService: authService,
-    storageService: storage,
+    documentStorageService: documentStorageService,
     downloadQueue,
     processor,
   });
-
-  const metadataFilePath = `metadata.json`;
 
   let downloadedItems = 0;
 
   // Handle the item-added event
   downloadQueue.on('item-added', async (item) => {
     // Save the item into the an object storage, that way we can update it once its downloaded to mark it as completed
-    const downloadItem: DownloadedItem = { ...item.item, downloaded: false };
-    items.push(downloadItem);
+    const downloadItem: DownloadedItem = { ...item.item, downloaded: 0 };
+    
+    // Prepare the data for SQLite storage by extracting only the fields we need
+    const dbItem = {
+      id: downloadItem.id,
+      description: downloadItem.description || '',
+      productUrl: downloadItem.productUrl || '',
+      baseUrl: downloadItem.baseUrl || '',
+      mimeType: downloadItem.mimeType || '',
+      filename: downloadItem.filename || '',
+      downloaded: downloadItem.downloaded ? Date.now() : 0,
+      mediaMetadata: JSON.stringify(downloadItem.mediaMetadata),
+      contributorInfo: JSON.stringify(downloadItem.contributorInfo)
+    };
+
+    await documentStorageService.save('media_items', dbItem);
 
     const result = await downloader.download(item.item);
 
@@ -61,22 +104,32 @@ const run = async () => {
       console.log(`Downloaded ${item.item.filename} (${downloadedItems}/${downloadQueue.getTotalItems()})`);
 
       // Mark the item as downloaded
-      downloadItem.downloaded = true;
+      downloadItem.downloaded = Date.now();
 
       // Save the item with fs
-      await storage.saveFile(item.item.filename, result);
-      await storage.saveFile(metadataFilePath, JSON.stringify(items, null, 2));
+      await fileStorage.save(item.item.filename, result);
+      await documentStorageService.update('media_items', item.item.id, { downloaded: Date.now() });
     } else {
       console.error(`Failed to download ${item.item.filename}`);
     }
   });
 
-  const metadata = await storage.readJsonFile<Array<DownloadedItem>>('metadata.json');
+  const metadata = await documentStorageService.findAll('media_items');
   if (metadata) {
-    items = metadata;
+    items = metadata.map(item => ({
+      ...item,
+      mediaMetadata: JSON.parse(item.mediaMetadata as unknown as string),
+      contributorInfo: JSON.parse(item.contributorInfo as unknown as string)
+    }));
 
+    // no downloaded items
     downloadQueue.addFilter((item) => {
-      return items.some((metadataItem) => metadataItem.id === item.id && metadataItem.downloaded);
+      return items.some((metadataItem) => metadataItem.id === item.id && metadataItem.downloaded > 0);
+    });
+
+    // no duplicates
+    downloadQueue.addFilter((item) => {
+      return downloadQueue.getItems().some((i) => i.item.id === item.id);
     });
 
     items.forEach((item) => {

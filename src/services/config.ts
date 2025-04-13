@@ -4,6 +4,8 @@ type Config = {
   REDIRECT_URI: string;
   ACCESS_TOKEN?: string;
   REFRESH_TOKEN?: string;
+
+  STORAGE_PATH: string;
 };
 
 export class ConfigService {
@@ -11,6 +13,7 @@ export class ConfigService {
     CLIENT_ID: '',
     CLIENT_SECRET: '',
     REDIRECT_URI: '',
+    STORAGE_PATH: 'metadata.db',
   };
 
   constructor(config: Config) {
@@ -39,6 +42,7 @@ export class ConfigService {
       // Optional tokens
       ACCESS_TOKEN: config.ACCESS_TOKEN,
       REFRESH_TOKEN: config.REFRESH_TOKEN,
+      STORAGE_PATH: config.STORAGE_PATH || 'metadata.db',
     });
   }
 }
