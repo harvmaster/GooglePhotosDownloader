@@ -15,8 +15,8 @@ This tool allows you to download your Google Photos along with metadata such as 
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository-url>
-   cd google-photos-downloader
+   git clone git@github.com:harvmaster/GooglePhotosDownloader.git
+   cd GooglePhotosDownloader
    ```
 
 2. **Install Dependencies**
