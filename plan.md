@@ -26,6 +26,7 @@ This project is a Node.js application written in TypeScript that downloads all p
   - Use Node's built-in fetch for downloading images.
   - Implement error handling where each download is wrapped in try/catch to record any failures without stopping the entire process.
   - Maintain a JSON log of failed downloads including details like filename, URL, and error messages for manual reattempt or automated retries.
+  - Additionally, maintain a separate JSON file that maps downloaded images and their metadata. This file will be referenced on subsequent runs to prevent re-downloading images that have already been obtained.
 
 - **Handling Metadata & Albums:**
   - Download and store all metadata along with the images.
