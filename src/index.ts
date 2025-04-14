@@ -134,13 +134,14 @@ const run = async () => {
     });
 
     // no duplicates
-    downloadQueue.addFilter((item) => {
-      return downloadQueue.getItems().some((i) => i.item.id === item.id);
-    });
+    // downloadQueue.addFilter((item) => {
+    //   return downloadQueue.getItems().some((i) => i.item.id === item.id);
+    // });
 
-    items.forEach((item) => {
-      downloadQueue.addItem(item);
-    });
+    // items.forEach((item) => {
+    //   if (item.downloaded > 0)
+    //   downloadQueue.addItem(item);
+    // });
   }
 
   await indexer.scanLibrary();
