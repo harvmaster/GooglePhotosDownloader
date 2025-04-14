@@ -75,6 +75,7 @@ const run = async () => {
   });
 
   let downloadedItems = 0;
+  let downloadErrors = [];
 
   // Handle the item-added event
   downloadQueue.on('item-added', async (item) => {
@@ -96,21 +97,26 @@ const run = async () => {
 
     await documentStorageService.save('media_items', dbItem);
 
-    const result = await downloader.download(item.item);
+    try {
+      const result = await downloader.download(item.item);
 
-    if (result) {
-      // Update the downloaded items count
-      downloadedItems++;
-      console.log(`Downloaded ${item.item.filename} (${downloadedItems}/${downloadQueue.getTotalItems()})`);
+      if (result) {
+        // Update the downloaded items count
+        downloadedItems++;
+        console.log(`Downloaded ${item.item.filename} (${downloadedItems}/${downloadQueue.getTotalItems()})`);
 
-      // Mark the item as downloaded
-      downloadItem.downloaded = Date.now();
+        // Mark the item as downloaded
+        downloadItem.downloaded = Date.now();
 
-      // Save the item with fs
-      await fileStorage.save(item.item.filename, result);
-      await documentStorageService.update('media_items', item.item.id, { downloaded: Date.now() });
-    } else {
-      console.error(`Failed to download ${item.item.filename}`);
+        // Save the item with fs
+        await fileStorage.save(item.item.filename, result);
+        await documentStorageService.update('media_items', item.item.id, { downloaded: Date.now() });
+      } else {
+        console.error(`Failed to download ${item.item.filename}`);
+      }
+    } catch (err) {
+      downloadErrors.push(err.message)
+      fileStorage.save('errors.json', JSON.stringify(downloadErrors, null, 2))
     }
   });
 

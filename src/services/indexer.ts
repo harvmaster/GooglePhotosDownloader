@@ -71,8 +71,12 @@ export class Indexer<T extends { errors: IndexerError } = { errors: IndexerError
 
         const response: MediaItemsResponse = await this.photos.mediaItems.list(100, nextPageToken);
 
-        if (response === undefined || response.mediaItems === undefined) {
-          throw new Error(`No media items found: response: ${JSON.stringify(response)}`);
+        if (response === undefined) {
+          throw new Error(`No response from the media items request. Page: ${pageCount + 1}, url: ${nextPageToken}`)
+        }
+
+        if (response.mediaItems === undefined && response.nextPageToken === undefined) {
+          throw new Error(`No media items or next page token found for media item list request. Page: ${pageCount + 1}, url: ${nextPageToken}`)
         }
 
         nextPageToken = response.nextPageToken;
@@ -87,7 +91,7 @@ export class Indexer<T extends { errors: IndexerError } = { errors: IndexerError
         const result = await this.dependencies.processor.process(request, 0);
 
         // Add items to the queue
-        result.mediaItems.forEach(item => {
+        result.mediaItems?.forEach(item => {
           this.dependencies.downloadQueue.addItem(item);
         });
 

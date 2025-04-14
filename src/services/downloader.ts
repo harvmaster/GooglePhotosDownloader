@@ -42,7 +42,7 @@ export class DownloaderService {
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to download file. Status: ${response.status} - ${response.statusText}`);
+        throw new Error(`Failed to download file (${item.id}) { type: ${'video' in item.mediaMetadata ? 'video' : 'image'}}. Status: ${response.status} - ${response.statusText}`);
       }
 
       this.logger(`Downloaded ${item.filename}`);
@@ -56,7 +56,7 @@ export class DownloaderService {
     const request = () => this.exponentialBackoff.execute(fetchFile);
 
     // Process the request in parallel with priority 1 (medium priority)
-    const result = await this.dependencies.processor.process(request, 1);
+    const result = await this.dependencies.processor.process(request, 0);
 
     return result;
   }
